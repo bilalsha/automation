@@ -1,0 +1,6 @@
+profile="st"
+namespace="saggie"
+stage="dev"
+name="logging-monitoring"
+vpc_cidr_block="172.29.0.0/16"
+instance_type="t3.medium"

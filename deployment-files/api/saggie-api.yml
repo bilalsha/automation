@@ -1,0 +1,116 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: saggie
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saggie-api-properties
+  namespace: saggie
+  labels:
+    app: saggie-api
+data:
+  saggie-api.properties: |-
+    spring.profiles.active=dev
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: saggie-api-dev-properties
+  namespace: saggie
+  labels:
+    app: saggie-api
+data:
+  saggie-api-dev.properties: |-
+    flyway.baseline-on-migrate=true
+    server.port=8081
+    app.exclude.url=/v1.0/account/create,/home,/alprometheus
+    api.response.info.file.path=
+
+    endpoints.prometheus.enabled=true
+    endpoints.prometheus.id=alprometheus
+
+    management.security.enabled=false
+    management.metrics.export.prometheus.enabled=true
+    management.metrics.distribution.percentiles-histogram[http.server.requests]=true
+    management.metrics.distribution.percentiles[http.server.requests]=0.5, 0.75, 0.95, 0.98, 0.99, 0.999, 1.0
+    management.metrics.distribution.sla[http.server.requests]=10ms, 100ms
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spring-data-access-properties
+  namespace: saggie
+  labels:
+    app: saggie-api
+data:
+  spring-data-access.properties: |-
+    dataAccessDbUrl=jdbc:mysql://mysql.saggie.svc.cluster.local:3306/saagie_imf
+    dataAccessDbUsername=root
+    dataAccessDbPassword=password
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: saggie-api-deployment
+  namespace: saggie
+  labels:
+    app: saggie-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: saggie-api
+  template:
+    metadata:
+      labels:
+        app: saggie-api
+    spec:
+      containers:
+        - name: saggie-api
+          image: darex/saggie-api:v1
+          ports:
+            - containerPort: 8081
+          volumeMounts:
+            - name: saggie-api-properties
+              mountPath: /dev/saggie-api.properties
+              readOnly: true
+              subPath: saggie-api.properties
+            - name: saggie-api-dev-properties
+              mountPath: /dev/saggie-api-dev.properties
+              readOnly: true
+              subPath: saggie-api-dev.properties
+            - name: spring-data-access-properties
+              mountPath: /dev/spring-data-access.properties
+              readOnly: true
+              subPath: spring-data-access.properties
+      volumes:
+        - name: saggie-api-properties
+          configMap:
+            defaultMode: 0600
+            name: saggie-api-properties
+        - name: saggie-api-dev-properties
+          configMap:
+            defaultMode: 0600
+            name: saggie-api-dev-properties
+        - name: spring-data-access-properties
+          configMap:
+            defaultMode: 0600
+            name: spring-data-access-properties
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: saggie-api
+  namespace: saggie
+spec:
+  ports:
+    - port: 8081
+      targetPort: 8081
+      name: http
+      protocol: TCP
+  selector:
+    app: saggie-api
+  type: ClusterIP
+---
